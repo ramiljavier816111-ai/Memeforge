@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0614">
+<title>Create token — MemeForge (Solana)</title>
+
+<!-- Libraries load lazily, so the wallet buttons work even if the CDN is slow. -->
+<script type="importmap">
+{
+  "imports": {
+    "@solana/web3.js": "https://esm.sh/@solana/web3.js@1",
+    "@solana/spl-token": "https://esm.sh/@solana/spl-token@0.4?external=@solana/web3.js"
+  }
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0614; --bg-2:#120a24; --text:#f6f2ff; --muted:#a79fc4;
+    --pink:#ff3df2; --lime:#b6ff3b; --cyan:#27e8ff; --yellow:#ffd23f; --purple:#8b4dff;
+    --card:rgba(255,255,255,.055); --card-2:rgba(255,255,255,.075);
+    --border:rgba(255,255,255,.12); --border-strong:rgba(255,255,255,.22);
+    --danger:#ff5c7a; --ok:#b6ff3b;
+    --grad:linear-gradient(100deg,var(--pink),var(--purple) 45%,var(--cyan));
+    --grad-lime:linear-gradient(100deg,var(--lime),var(--cyan));
+    --display:"Bungee","Impact","Arial Black",sans-serif;
+    --body:"Space Grotesk",ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--body);background:var(--bg);color:var(--text);min-height:100vh;line-height:1.55;
+    padding-bottom:calc(48px + env(safe-area-inset-bottom));overflow-x:hidden;-webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit}
+  .wrap{max-width:780px;margin:0 auto;padding:0 18px;position:relative;z-index:2}
+
+  /* ============ MEMECOIN BACKGROUND (same as landing) ============ */
+  .bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;
+    background:
+      radial-gradient(55vw 50vh at 85% 0%,rgba(255,61,242,.26),transparent 70%),
+      radial-gradient(55vw 55vh at 0% 30%,rgba(39,232,255,.16),transparent 70%),
+      radial-gradient(60vw 50vh at 70% 100%,rgba(139,77,255,.26),transparent 70%),
+      linear-gradient(180deg,var(--bg),var(--bg-2));
+  }
+  .bg::before{
+    content:"";position:absolute;left:-50%;right:-50%;bottom:-10%;height:55%;
+    background-image:linear-gradient(rgba(182,255,59,.2) 1px,transparent 1px),linear-gradient(90deg,rgba(182,255,59,.2) 1px,transparent 1px);
+    background-size:56px 56px;transform:perspective(500px) rotateX(62deg);transform-origin:50% 100%;
+    mask-image:linear-gradient(to top,#000 5%,transparent 85%);-webkit-mask-image:linear-gradient(to top,#000 5%,transparent 85%);
+    animation:gridmove 3.5s linear infinite;
+  }
+  @keyframes gridmove{to{background-position:0 56px,0 0}}
+  .bg::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 40%,transparent 55%,rgba(0,0,0,.55))}
+  .float{position:absolute;will-change:transform;user-select:none;filter:drop-shadow(0 8px 18px rgba(0,0,0,.4));animation:drift linear infinite}
+  @keyframes drift{0%{transform:translate3d(0,110vh,0) rotate(0)}100%{transform:translate3d(var(--dx,0),-20vh,0) rotate(var(--rot,360deg))}}
+  .coin-bg{
+    position:absolute;border-radius:50%;display:grid;place-items:center;font-family:var(--display);color:#6b4300;
+    background:radial-gradient(circle at 32% 28%,#fff6b8,var(--yellow) 45%,#e69b00);
+    border:3px solid #b87400;box-shadow:inset 0 -6px 12px rgba(0,0,0,.18);will-change:transform;animation:drift linear infinite;
+  }
+
+  /* ============ NAV ============ */
+  .topbar{position:sticky;top:0;z-index:40;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);background:rgba(10,6,20,.66);border-bottom:1px solid var(--border)}
+  .topbar-in{max-width:1120px;margin:0 auto;padding:0 20px;height:66px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:20px;text-decoration:none;letter-spacing:.5px}
+  .brand .mk{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:20px;
+    background:radial-gradient(circle at 32% 28%,#fff6b8,var(--yellow) 45%,#e69b00);border:2px solid #b87400;box-shadow:0 0 22px rgba(255,210,63,.5)}
+  .nav-links{display:flex;gap:26px;font-size:14.5px;font-weight:600;color:var(--muted)}
+  .nav-links a{text-decoration:none;transition:color .15s}
+  .nav-links a:hover{color:var(--lime)}
+  .nav-right{display:flex;gap:10px;align-items:center}
+
+  /* ============ BUTTONS (same as landing) ============ */
+  .btn{
+    --glow:182,255,59;
+    position:relative;isolation:isolate;overflow:hidden;
+    display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 30px;border-radius:999px;
+    font-family:var(--body);font-size:16px;font-weight:700;letter-spacing:.2px;text-decoration:none;cursor:pointer;color:#fff;
+    border:1px solid transparent;white-space:nowrap;
+    transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s ease,background-position .5s ease,border-color .25s ease,opacity .2s;
+    -webkit-user-select:none;user-select:none;
+  }
+  .btn::after{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;
+    background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.55) 50%,transparent 70%);
+    transform:translateX(-120%);transition:transform .7s cubic-bezier(.22,1,.36,1)}
+  .btn:hover:not(:disabled)::after{transform:translateX(120%)}
+  .btn:hover:not(:disabled){transform:translateY(-3px)}
+  .btn:active:not(:disabled){transform:translateY(0) scale(.97);transition-duration:.12s}
+  .btn:focus-visible{outline:2px solid #fff;outline-offset:3px}
+  .btn:disabled{opacity:.42;cursor:not-allowed}
+  .btn-primary{
+    color:#0d1a07;background:linear-gradient(120deg,#d4ff5a,var(--lime) 40%,#4dffb0);background-size:160% 100%;
+    box-shadow:0 0 0 1px rgba(255,255,255,.25) inset,0 10px 30px rgba(182,255,59,.32);
+  }
+  .btn-primary:hover:not(:disabled){background-position:100% 0;box-shadow:0 0 0 1px rgba(255,255,255,.35) inset,0 16px 44px rgba(182,255,59,.5)}
+  .btn-pink{
+    color:#fff;background:linear-gradient(120deg,var(--pink),var(--purple) 55%,#5b8cff);background-size:160% 100%;
+    box-shadow:0 0 0 1px rgba(255,255,255,.22) inset,0 10px 30px rgba(255,61,242,.34);
+  }
+  .btn-pink:hover:not(:disabled){background-position:100% 0;box-shadow:0 0 0 1px rgba(255,255,255,.3) inset,0 16px 44px rgba(255,61,242,.55)}
+  .btn-ghost{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.16);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+  .btn-ghost::after{background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%)}
+  .btn-ghost:hover:not(:disabled){border-color:rgba(39,232,255,.7);background:rgba(39,232,255,.08);box-shadow:0 12px 36px rgba(39,232,255,.18)}
+  .btn-sm{min-height:42px;padding:0 20px;font-size:14px}
+  .btn-block{width:100%;min-height:62px;font-size:17px}
+  .wallet-chip{
+    display:none;align-items:center;gap:9px;min-height:42px;padding:0 16px 0 13px;border-radius:999px;cursor:pointer;
+    background:rgba(182,255,59,.1);border:1px solid rgba(182,255,59,.4);font:inherit;font-size:13px;font-weight:700;color:var(--lime);font-family:var(--mono);
+    transition:transform .3s cubic-bezier(.22,1,.36,1),background .2s;
+  }
+  .wallet-chip:hover{background:rgba(182,255,59,.18);transform:translateY(-2px)}
+  .wallet-chip .dot{width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 10px var(--lime)}
+
+  /* ============ HERO ============ */
+  .hero{padding:48px 0 30px;text-align:center}
+  .pill{
+    display:inline-flex;align-items:center;gap:8px;padding:7px 15px;border-radius:999px;font-size:13px;font-weight:700;
+    background:rgba(182,255,59,.1);border:1px solid rgba(182,255,59,.4);color:var(--lime);
+  }
+  .pill i{width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 10px var(--lime);animation:blink 1.4s infinite}
+  @keyframes blink{50%{opacity:.3}}
+  .hero h1{font-family:var(--display);font-size:clamp(34px,7vw,64px);line-height:1.02;letter-spacing:.5px;margin-top:20px;text-transform:uppercase}
+  .hero h1 .g1{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .hero h1 .g2{background:var(--grad-lime);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .hero p{color:var(--muted);margin:18px auto 0;max-width:540px;font-size:16.5px}
+
+  /* ============ CARDS ============ */
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:28px;padding:26px;margin-bottom:18px;
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .25s,box-shadow .25s;
+  }
+  .card:focus-within{border-color:rgba(182,255,59,.45);box-shadow:0 20px 60px rgba(139,77,255,.18)}
+  .card-head{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .step{
+    width:46px;height:46px;border-radius:15px;flex:none;display:grid;place-items:center;font-family:var(--display);font-size:20px;
+    color:#10220a;background:var(--lime);box-shadow:0 5px 0 #6fa514;
+  }
+  section.card:nth-of-type(2) .step{background:var(--pink);color:#fff;box-shadow:0 5px 0 #a3189a}
+  section.card:nth-of-type(3) .step{background:var(--cyan);color:#052a30;box-shadow:0 5px 0 #0f93a3}
+  .card-head h2{font-family:var(--display);font-size:20px;letter-spacing:.4px;text-transform:uppercase;font-weight:400}
+  .card-head p{font-size:13px;color:var(--muted);margin-top:2px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field{margin-bottom:14px;min-width:0}
+  .grid .field{margin-bottom:0}
+  label.lbl{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;letter-spacing:.3px;text-transform:uppercase}
+  input[type=text],input[type=number],input[type=url],input:not([type]){
+    width:100%;min-height:52px;padding:0 16px;border-radius:16px;
+    background:rgba(10,6,20,.55);border:1px solid var(--border);color:var(--text);
+    font:inherit;font-size:16px;outline:none;transition:border-color .2s,box-shadow .2s,background .2s;
+  }
+  input:hover{border-color:var(--border-strong)}
+  input:focus{border-color:var(--lime);box-shadow:0 0 0 4px rgba(182,255,59,.15);background:rgba(10,6,20,.8)}
+  input::placeholder{color:#6a6288}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:9px}
+  .hint a,.card a.link{color:var(--lime)}
+
+  /* wallet card */
+  .wallet-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .balance{font-family:var(--mono);font-size:13px;color:var(--cyan)}
+  .notice{
+    display:none;border-radius:16px;padding:12px 15px;font-size:13px;margin-top:16px;
+    background:rgba(255,200,87,.08);border:1px solid rgba(255,200,87,.3);color:#ffe3a3;
+  }
+  .notice.show{display:block}
+  details.adv{margin-top:16px}
+  details.adv summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:700;list-style:none}
+  details.adv summary::-webkit-details-marker{display:none}
+  details.adv summary::before{content:"▸ "}
+  details[open].adv summary::before{content:"▾ "}
+  details.adv .field{margin-top:12px;margin-bottom:0}
+
+  /* logo upload */
+  .dropzone{
+    border:2px dashed var(--border-strong);border-radius:20px;padding:30px 16px;text-align:center;cursor:pointer;
+    color:var(--muted);font-size:14px;transition:border-color .2s,background .2s,transform .3s cubic-bezier(.22,1,.36,1);
+  }
+  .dropzone:hover,.dropzone.drag{border-color:var(--lime);background:rgba(182,255,59,.06);transform:translateY(-2px)}
+  .dropzone .big{font-size:34px;display:block;margin-bottom:8px}
+  .dropzone b{color:var(--text)}
+  .preview{display:none;align-items:center;gap:14px;flex-wrap:wrap;padding:14px;border-radius:20px;background:var(--card-2);border:1px solid var(--border)}
+  .preview img{width:64px;height:64px;border-radius:16px;object-fit:cover;background:rgba(255,255,255,.05)}
+  .preview .meta{flex:1;min-width:140px;font-size:12.5px;color:var(--muted);word-break:break-all}
+  .preview .meta b{color:var(--text)}
+  .preview .actions{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* authorities */
+  .auth{
+    display:flex;align-items:center;gap:14px;padding:18px;border-radius:22px;margin-bottom:12px;
+    background:var(--card-2);border:1px solid var(--border);transition:border-color .25s,background .25s;
+  }
+  .auth:last-child{margin-bottom:0}
+  .auth:hover{border-color:var(--border-strong)}
+  .auth .icon{font-size:24px;width:48px;height:48px;border-radius:15px;background:rgba(182,255,59,.12);display:grid;place-items:center;flex:none}
+  .auth .body{flex:1;min-width:0}
+  .auth h3{font-size:15.5px;font-weight:700}
+  .auth p{font-size:13px;color:var(--muted);margin-top:2px}
+  .auth .status{
+    display:inline-block;margin-top:9px;font-size:12px;font-family:var(--mono);
+    padding:4px 11px;border-radius:999px;background:rgba(182,255,59,.12);color:var(--lime);
+  }
+  .auth.revoked{border-color:rgba(255,92,122,.5);background:rgba(255,92,122,.06)}
+  .auth.revoked .status{background:rgba(255,92,122,.14);color:#ff9bb0}
+  .auth.revoked .icon{background:rgba(255,92,122,.16)}
+  .switch{position:relative;width:54px;height:32px;flex:none;display:block}
+  .switch input{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:2;width:100%;height:100%;margin:0;min-height:0}
+  .switch span{position:absolute;inset:0;border-radius:999px;background:rgba(255,255,255,.16);transition:background .25s}
+  .switch span::after{
+    content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;
+    transition:transform .3s cubic-bezier(.22,1,.36,1);box-shadow:0 2px 6px rgba(0,0,0,.4);
+  }
+  .switch input:checked + span{background:var(--danger)}
+  .switch input:checked + span::after{transform:translateX(22px)}
+  .switch input:focus-visible + span{box-shadow:0 0 0 4px rgba(255,92,122,.3)}
+  .switch-cap{font-size:10.5px;color:var(--muted);text-align:center;margin-top:5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+
+  /* log + result */
+  #log{
+    background:rgba(0,0,0,.42);border:1px solid var(--border);border-radius:18px;padding:15px;margin-top:18px;
+    font-family:var(--mono);font-size:12px;line-height:1.8;max-height:230px;overflow-y:auto;word-break:break-word;
+  }
+  #log .t{color:#6f6b8c} #log .err{color:var(--danger)} #log .ok{color:var(--lime)} #log .info{color:#c1b3ff}
+  .result{display:none;margin-top:18px;padding:20px;border-radius:22px;background:rgba(182,255,59,.07);border:1px solid rgba(182,255,59,.35)}
+  .result h3{font-family:var(--display);font-weight:400;color:var(--lime);font-size:20px;margin-bottom:14px;text-transform:uppercase}
+  .kv{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border);font-size:13px}
+  .kv:first-of-type{border-top:0}
+  .kv b{flex:none;width:96px;color:var(--muted);font-weight:700;font-size:12px}
+  .kv code{flex:1;min-width:0;font-family:var(--mono);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .links{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+
+  .foot{text-align:center;color:var(--muted);font-size:12.5px;margin-top:30px}
+  .foot a{color:var(--muted)} .foot a:hover{color:var(--lime)}
+
+  /* wallet modal (bottom sheet on mobile) */
+  .overlay{
+    position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
+    background:rgba(5,2,12,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  }
+  .overlay.open{display:flex}
+  .sheet{
+    width:100%;max-width:450px;max-height:88vh;overflow-y:auto;border-radius:30px;padding:26px;
+    background:linear-gradient(180deg,#1a1033,#120a24);border:1px solid var(--border-strong);box-shadow:0 30px 90px rgba(139,77,255,.35);
+    animation:pop .3s cubic-bezier(.22,1,.36,1);
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .sheet-head h3{font-family:var(--display);font-weight:400;font-size:22px;text-transform:uppercase;letter-spacing:.4px}
+  .x{background:var(--card-2);border:1px solid var(--border);color:var(--text);width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:15px;transition:border-color .2s,transform .3s}
+  .x:hover{border-color:var(--pink);transform:rotate(90deg)}
+  .sheet .sub{color:var(--muted);font-size:13.5px;margin-bottom:18px}
+  .wopt{
+    display:flex;align-items:center;gap:14px;width:100%;padding:15px;margin-bottom:11px;border-radius:20px;
+    background:var(--card-2);border:1px solid var(--border);color:var(--text);font:inherit;text-align:left;
+    cursor:pointer;text-decoration:none;transition:border-color .2s,transform .3s cubic-bezier(.22,1,.36,1),background .2s;
+  }
+  .wopt:hover{border-color:var(--lime);transform:translateY(-2px);background:rgba(182,255,59,.06)}
+  .wopt:active{transform:scale(.985)}
+  .wopt .wi{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-weight:800;font-size:19px;color:#fff;flex:none}
+  .wopt .wn{font-weight:700;font-size:15.5px}
+  .wopt .ws{font-size:12.5px;color:var(--muted)}
+  .wopt .tag{margin-left:auto;font-size:11px;font-weight:700;padding:4px 11px;border-radius:999px;white-space:nowrap}
+  .tag.det{background:rgba(182,255,59,.14);color:var(--lime)}
+  .tag.get{background:rgba(255,255,255,.08);color:var(--muted)}
+  .tag.app{background:rgba(255,61,242,.18);color:#ffb3f8}
+  .sheet .tip{font-size:12.5px;color:var(--muted);margin-top:14px;line-height:1.6}
+
+  /* textarea + sub-headings */
+  textarea{
+    width:100%;min-height:110px;padding:14px 16px;border-radius:16px;resize:vertical;
+    background:rgba(10,6,20,.55);border:1px solid var(--border);color:var(--text);
+    font:inherit;font-size:16px;line-height:1.5;outline:none;transition:border-color .2s,box-shadow .2s,background .2s;
+  }
+  textarea:hover{border-color:var(--border-strong)}
+  textarea:focus{border-color:var(--lime);box-shadow:0 0 0 4px rgba(182,255,59,.15);background:rgba(10,6,20,.8)}
+  textarea::placeholder{color:#6a6288}
+  .count{float:right;font-weight:600;color:#6f6b8c;letter-spacing:0;text-transform:none}
+  .sub-h{font-family:var(--display);font-weight:400;font-size:15px;letter-spacing:.4px;text-transform:uppercase;margin:26px 0 14px;color:var(--cyan)}
+  .sub-h:first-of-type{margin-top:4px}
+  .divider{height:1px;background:var(--border);margin:24px 0 4px}
+
+  /* banner */
+  .dropzone.wide{padding:34px 16px}
+  .bannerPreview{display:none;position:relative;border-radius:20px;overflow:hidden;border:1px solid var(--border);background:var(--card-2)}
+  .bannerPreview img{display:block;width:100%;aspect-ratio:3/1;object-fit:cover}
+  .bannerPreview .bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;font-size:12.5px;color:var(--muted)}
+  .bannerPreview .bar b{color:var(--text)}
+
+  /* social grid */
+  .social{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .social .si{width:48px;height:48px;border-radius:14px;flex:none;display:grid;place-items:center;font-size:20px;background:var(--card-2);border:1px solid var(--border)}
+  .social input{flex:1}
+  .toggle-row{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:18px;background:var(--card-2);border:1px solid var(--border);margin-top:14px;cursor:pointer}
+  .toggle-row input{width:20px;height:20px;margin-top:2px;accent-color:var(--lime);flex:none;min-height:0}
+  .toggle-row b{display:block;font-size:14.5px}
+  .toggle-row span{font-size:12.5px;color:var(--muted)}
+
+
+  /* optional section toggles */
+  .opt{margin-top:22px;border-top:1px solid var(--border);padding-top:20px}
+  .opt-head{display:flex;align-items:center;gap:14px;cursor:pointer}
+  .opt-head .ot{flex:1;min-width:0}
+  .opt-head h3{font-family:var(--display);font-weight:400;font-size:15px;letter-spacing:.4px;text-transform:uppercase;color:var(--cyan)}
+  .opt-head p{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .switch.ok input:checked + span{background:var(--lime)}
+  .switch.ok input:checked + span::after{background:#10220a}
+  .switch.ok input:focus-visible + span{box-shadow:0 0 0 4px rgba(182,255,59,.3)}
+  .opt-body{display:none;margin-top:18px}
+  .opt.on .opt-body{display:block;animation:pop .3s cubic-bezier(.22,1,.36,1)}
+
+
+  /* fee chips on toggles */
+  .fee-tag{
+    display:inline-flex;align-items:center;gap:5px;flex:none;white-space:nowrap;
+    height:24px;padding:0 10px 0 8px;border-radius:999px;
+    font-family:var(--mono);font-size:11.5px;font-weight:700;letter-spacing:0;line-height:1;
+    color:var(--muted);background:rgba(255,255,255,.06);border:1px solid var(--border);
+    transition:color .25s,background .25s,border-color .25s,box-shadow .25s;
+  }
+  .fee-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.7;transition:opacity .25s}
+  .fee-tag.on{color:#10220a;background:var(--lime);border-color:var(--lime);box-shadow:0 0 14px rgba(182,255,59,.35)}
+  .fee-tag.on::before{opacity:1}
+  .opt-head .fee-tag{margin-right:-4px}
+  .auth-ctl{display:flex;flex-direction:column;align-items:center;gap:9px}
+  .auth-ctl .switch-cap{margin-top:-2px}
+
+  /* fee receipt */
+  .receipt{margin-top:18px;border-radius:22px;background:var(--card-2);border:1px solid var(--border);padding:18px 18px 14px;font-size:13.5px}
+  .receipt h3{font-family:var(--display);font-weight:400;font-size:15px;letter-spacing:.4px;text-transform:uppercase;color:var(--cyan);margin-bottom:10px}
+  .rc-row{display:flex;align-items:baseline;gap:10px;padding:8px 0;border-top:1px dashed var(--border)}
+  .rc-row:first-of-type{border-top:0}
+  .rc-row .n{flex:1;min-width:0}
+  .rc-row .n small{display:block;color:var(--muted);font-size:11.5px;margin-top:1px}
+  .rc-row .v{font-family:var(--mono);font-weight:700;white-space:nowrap}
+  .rc-row.off{opacity:.42}
+  .rc-row.off .v{text-decoration:line-through}
+  .rc-sec{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:14px 0 2px}
+  .rc-total{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:12px;padding-top:12px;border-top:2px solid var(--border-strong);font-weight:700}
+  .rc-total .v{font-family:var(--mono);font-size:18px;color:var(--lime)}
+  .rc-note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.55}
+  .rc-warn{display:none;margin-top:10px;font-size:12px;color:#ffb3c0;background:rgba(255,92,122,.08);border:1px solid rgba(255,92,122,.35);border-radius:12px;padding:8px 12px}
+
+  /* wallet logo (image link from admin, or colored letter) */
+  .wopt.extra{display:none}
+  #walletList.expanded .wopt.extra{display:flex;animation:pop .25s cubic-bezier(.22,1,.36,1)}
+  .wmore{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:46px;margin-bottom:11px;border-radius:20px;border:1px dashed var(--border-strong);
+    background:transparent;color:var(--cyan);font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:background .2s,border-color .2s}
+  .wmore:hover{background:rgba(39,232,255,.08);border-color:var(--cyan)}
+  .wmore .chev{display:inline-block;transition:transform .25s}
+  #walletList.expanded .wmore .chev{transform:rotate(180deg)}
+  .wsearch{position:relative;margin:0 0 14px}
+  .wsearch input{width:100%;min-height:46px;padding:0 40px 0 42px;border-radius:16px;background:var(--card-2);border:1px solid var(--border);color:var(--text);font:inherit;font-size:15px;outline:none;transition:border-color .2s,box-shadow .2s}
+  .wsearch input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(39,232,255,.15)}
+  .wsearch .mag{position:absolute;left:15px;top:50%;transform:translateY(-50%);width:17px;height:17px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
+  .wsearch .clr{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;display:none}
+  .wsearch.has .clr{display:block} .wsearch .clr:hover{color:var(--text);background:rgba(255,255,255,.08)}
+  .wcount{font-size:12px;color:var(--muted);margin:-4px 2px 10px}
+  .wnone{padding:22px 10px;text-align:center;color:var(--muted);font-size:14px}
+  #walletList.searching .wopt.extra{display:flex}
+  #walletList{max-height:min(52vh,460px);overflow-y:auto;padding-right:4px;margin-right:-4px;overscroll-behavior:contain}
+  .wopt .wi{overflow:hidden}
+  .wopt .wi img{width:100%;height:100%;object-fit:cover;display:block}
+
+  /* toasts */
+  .toasts{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:10px;width:min(420px,calc(100vw - 28px));pointer-events:none}
+  .toast{
+    pointer-events:auto;position:relative;overflow:hidden;display:flex;align-items:flex-start;gap:12px;padding:14px 14px 17px;border-radius:20px;
+    background:rgba(24,14,46,.96);border:1px solid var(--border-strong);box-shadow:0 18px 60px rgba(0,0,0,.6),0 0 0 1px rgba(182,255,59,.08);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);animation:toastin .35s cubic-bezier(.22,1,.36,1);
+  }
+  .toast.out{animation:toastout .22s ease forwards}
+  @keyframes toastin{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:none}}
+  @keyframes toastout{to{opacity:0;transform:translateY(10px) scale(.97)}}
+  .toast .ti{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:16px;font-weight:800;background:rgba(182,255,59,.16);color:var(--lime)}
+  .toast.err .ti{background:rgba(255,92,122,.16);color:var(--danger)}
+  .toast.info .ti{background:rgba(39,232,255,.14);color:var(--cyan)}
+  .toast .tb{flex:1;min-width:0;padding-top:1px;font-size:14px;line-height:1.4;word-break:break-word}
+  .toast .tb b{display:block;font-size:15px}
+  .toast .tb span{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+  .toast .tx{border:0;background:transparent;color:var(--muted);cursor:pointer;width:28px;height:28px;border-radius:50%;font-size:16px;flex:none}
+  .toast .tx:hover{background:rgba(255,255,255,.1);color:var(--text)}
+  .toast .tt{position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--lime);transform-origin:left;animation:toastt linear forwards}
+  .toast.err .tt{background:var(--danger)} .toast.info .tt{background:var(--cyan)}
+  @keyframes toastt{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+
+  /* creation progress */
+  .cprog{margin-top:18px;padding:16px 18px 14px;border-radius:22px;background:var(--card-2);border:1px solid var(--border);animation:pop .3s cubic-bezier(.22,1,.36,1)}
+  .cprog[hidden]{display:none}
+  .cprog-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .cprog-top b{font-size:14.5px}
+  .cprog-top span{font-family:var(--mono);font-size:12.5px;color:var(--cyan);white-space:nowrap}
+  .cprog-track{height:12px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+  .cprog-fill{height:100%;width:0;border-radius:99px;background:var(--grad);transition:width .45s cubic-bezier(.22,1,.36,1);position:relative;overflow:hidden}
+  .cprog-fill::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.45) 50%,transparent 70%);animation:shine 1.4s linear infinite}
+  @keyframes shine{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+  .cprog.done .cprog-fill{background:var(--grad-lime)} .cprog.done .cprog-fill::after,.cprog.fail .cprog-fill::after{display:none}
+  .cprog.fail .cprog-fill{background:var(--danger)}
+  .cprog-sub{display:flex;justify-content:space-between;gap:10px;margin-top:9px;font-size:12px;color:var(--muted)}
+  .cprog-dots{display:flex;gap:5px;margin-top:11px}
+  .cprog-dots i{flex:1;height:4px;border-radius:99px;background:rgba(255,255,255,.1);transition:background .3s}
+  .cprog-dots i.on{background:var(--lime)} .cprog.fail .cprog-dots i.cur{background:var(--danger)}
+
+  /* small screens */
+  @media (max-width:640px){
+    .card{padding:20px;border-radius:24px}
+    .grid{grid-template-columns:1fr}
+    .grid .field{margin-bottom:14px}
+    .nav-links{display:none}
+    .kv{flex-wrap:wrap}
+    .kv b{width:100%}
+    .hero{padding-top:34px}
+    .wallet-row .btn{width:100%}
+    .wallet-row .btn.btn-sm{width:auto}
+    .overlay{align-items:flex-end;padding:0}
+    .sheet{max-width:none;border-radius:30px 30px 0 0;padding-bottom:calc(26px + env(safe-area-inset-bottom))}
+  }
+  /* very small phones, short screens, no sideways scrolling */
+  body{overflow-x:clip}
+  .sheet{max-height:88vh;max-height:88dvh}
+  @media (max-width:380px){.wrap{padding:0 12px}.card{padding:16px;border-radius:20px}.sheet{padding-left:16px;padding-right:16px}}
+  @media (max-height:520px){.sheet{max-height:94vh;max-height:94dvh}#walletList{max-height:34vh}}
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+    .float,.coin-bg{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="bg" id="bg" aria-hidden="true"></div>
+
+<!-- top bar -->
+<nav class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="index.html"><span class="mk">🚀</span> MemeForge</a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="index.html#how">How it works</a>
+      <a href="https://raydium.io/liquidity/create-pool/" target="_blank" rel="noopener noreferrer">Liquidity ↗</a>
+    </div>
+    <div class="nav-right">
+      <button class="wallet-chip" id="walletChip" title="Wallet menu"><span class="dot"></span><span id="chipAddr"></span></button>
+      <button class="btn btn-primary btn-sm" id="topConnect">Connect</button>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <!-- hero -->
+  <header class="hero">
+    <span class="pill"><i></i> <span id="netPill">Solana · Mainnet</span></span>
+    <h1>Create your <span class="g1">token</span><br><span class="g2">in one tx</span></h1>
+    <p>Name it, give it a logo, and choose whether to keep or revoke the Mint, Freeze and Metadata authorities. Everything is signed by your own wallet.</p>
+  </header>
+
+  <!-- 1. wallet -->
+  <section class="card">
+    <div class="card-head"><div class="step">1</div><div><h2>Wallet</h2><p>Phantom, Solflare, Backpack and many more — desktop &amp; mobile</p></div></div>
+    <div class="wallet-row">
+      <button class="btn btn-primary" id="connectBtn">👛 Connect wallet</button>
+      <button class="btn btn-ghost" id="airdropBtn" disabled style="display:none">🪂 Get devnet SOL</button>
+      <button class="btn btn-ghost" id="disconnectBtn" style="display:none">Disconnect</button>
+      <span class="balance" id="walletBal"></span>
+    </div>
+    <div class="notice" id="httpsNotice">
+      ⚠️ Mobile wallet links need this page to be served from an <b>https://</b> address. A local file or <code>localhost</code> can't be opened inside a wallet app — host it first (GitHub Pages, Netlify, Vercel…).
+    </div>
+    <p class="hint" id="netHint"></p>
+    <details class="adv">
+      <summary>Advanced</summary>
+      <div class="field"><label class="lbl" for="rpc">RPC endpoint</label><input id="rpc" type="url" value="https://api.mainnet-beta.solana.com" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    </details>
+  </section>
+
+  <!-- 2. token details -->
+  <section class="card">
+    <div class="card-head"><div class="step">2</div><div><h2>Token details</h2><p>How your token appears in wallets</p></div></div>
+    <div class="grid" style="margin-bottom:14px">
+      <div class="field"><label class="lbl" for="name">Name *</label><input id="name" placeholder="My Awesome Token" maxlength="32" autocomplete="off"></div>
+      <div class="field"><label class="lbl" for="symbol">Symbol *</label><input id="symbol" placeholder="MAT" maxlength="10" autocomplete="off" autocapitalize="characters"></div>
+    </div>
+    <div class="grid" style="margin-bottom:14px">
+      <div class="field"><label class="lbl" for="decimals">Decimals</label><input id="decimals" type="number" inputmode="numeric" min="0" max="9" value="9"></div>
+      <div class="field"><label class="lbl" for="supply">Initial supply</label><input id="supply" type="number" inputmode="numeric" min="0" value="1000000"></div>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="desc">Description <span class="count" id="descCount">0 / 500</span></label>
+      <textarea id="desc" maxlength="500" placeholder="Tell holders what your token is about — the story, the community, the vibe…"></textarea>
+    </div>
+
+    <div class="field">
+      <label class="lbl">Logo (PNG · JPG · SVG · GIF · max 2 MB)</label>
+      <div class="dropzone" id="dropzone"><span class="big">🖼️</span><b>Tap to upload</b> or drop your logo here</div>
+      <input type="file" id="logoInput" accept="image/png,image/jpeg,image/svg+xml,image/gif" hidden>
+      <div class="preview" id="logoPreview">
+        <img id="logoImg" alt="Logo preview">
+        <div class="meta" id="logoMeta"></div>
+        <div class="actions">
+          <button class="btn btn-ghost btn-sm" id="jsonBtn">⬇ metadata.json</button>
+          <button class="btn btn-ghost btn-sm" id="logoRemove">✕</button>
+        </div>
+      </div>
+      <p class="hint">The logo, banner, description, creator info and social links are all bundled into a downloadable <b>metadata.json</b> (use the button above after filling everything in). On-chain metadata can only point to a hosted URL, so upload that file (ideally with the image too) to <b>IPFS / Arweave</b> and paste the link below. Nothing is uploaded from this page.</p>
+    </div>
+
+<div class="opt" id="opt_banner">
+      <label class="opt-head" for="tg_banner">
+        <div class="ot"><h3>Token banner</h3><p>Optional · PNG · JPG · GIF · max 2 MB · 3:1 works best</p></div>
+        <span class="fee-tag" data-fee-for="tg_banner">+0.1 SOL</span><span class="switch ok"><input type="checkbox" id="tg_banner" aria-label="Add token banner"><span></span></span>
+      </label>
+      <div class="opt-body">
+        <label class="lbl">Banner image</label>
+      <div class="dropzone wide" id="bannerDrop"><span class="big">🌄</span><b>Tap to upload</b> a banner or drop it here</div>
+      <input type="file" id="bannerInput" accept="image/png,image/jpeg,image/gif" hidden>
+      <div class="bannerPreview" id="bannerPreview">
+        <img id="bannerImg" alt="Banner preview">
+        <div class="bar"><span id="bannerMeta"></span><button class="btn btn-ghost btn-sm" id="bannerRemove" type="button">✕ Remove</button></div>
+      </div>
+      </div>
+    </div>
+
+    <div class="opt" id="opt_creator">
+      <label class="opt-head" for="tg_creator">
+        <div class="ot"><h3>Creator info</h3><p>Optional · shown in metadata and as verified creator</p></div>
+        <span class="fee-tag" data-fee-for="tg_creator">+0.1 SOL</span><span class="switch ok"><input type="checkbox" id="tg_creator" aria-label="Add creator info"><span></span></span>
+      </label>
+      <div class="opt-body">
+    <div class="grid" style="margin-bottom:14px">
+      <div class="field"><label class="lbl" for="creatorName">Creator / team name</label><input id="creatorName" placeholder="Satoshi Labs" maxlength="40" autocomplete="off"></div>
+      <div class="field"><label class="lbl" for="creatorSite">Creator website</label><input id="creatorSite" type="url" placeholder="https://yourproject.xyz" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    </div>
+    <label class="toggle-row" for="verifiedCreator">
+      <input type="checkbox" id="verifiedCreator" checked>
+      <div><b>List my wallet as verified on-chain creator</b><span>Your connected wallet is written into the token's Metaplex metadata as the creator (100% share) and verified by your signature, so explorers can show who made it.</span></div>
+    </label>
+      </div>
+    </div>
+
+    <div class="opt" id="opt_social">
+      <label class="opt-head" for="tg_social">
+        <div class="ot"><h3>Social links</h3><p>Optional · website, X, Telegram, Discord</p></div>
+        <span class="fee-tag" data-fee-for="tg_social">+0.1 SOL</span><span class="switch ok"><input type="checkbox" id="tg_social" aria-label="Add social links"><span></span></span>
+      </label>
+      <div class="opt-body">
+    <div class="social"><div class="si">🌐</div><input id="websiteUrl" type="url" placeholder="Website — https://…" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    <div class="social"><div class="si">𝕏</div><input id="twitterUrl" type="url" placeholder="X / Twitter — https://x.com/yourtoken" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    <div class="social"><div class="si">✈️</div><input id="telegramUrl" type="url" placeholder="Telegram — https://t.me/yourtoken" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    <div class="social"><div class="si">💬</div><input id="discordUrl" type="url" placeholder="Discord — https://discord.gg/…" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    <div class="social" style="margin-bottom:0"><div class="si">🔗</div><input id="otherUrl" type="url" placeholder="Other link (GitHub, Linktree…)" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+      </div>
+    </div>
+
+    <div class="field" style="margin:22px 0 0">
+      <label class="lbl" for="uri">Metadata URI (optional)</label>
+      <input id="uri" type="url" placeholder="https://ipfs.io/ipfs/CID/metadata.json" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <p class="hint">The mint keypair is generated in your browser and your wallet signs. <b>No private keys are ever requested or stored.</b></p>
+    </div>
+  </section>
+
+  <!-- 3. authorities -->
+  <section class="card">
+    <div class="card-head"><div class="step">3</div><div><h2>Authorities</h2><p>Kept by your wallet unless you revoke them. Revoking is permanent.</p></div></div>
+
+    <div class="auth" id="authMint">
+      <div class="icon">🪙</div>
+      <div class="body"><h3>Mint authority</h3><p>Can mint more supply. Revoke for a fixed supply.</p><span class="status" id="stMint">—</span></div>
+      <div class="auth-ctl"><span class="fee-tag" data-fee-for="mintRevoke">+0.1 SOL</span><label class="switch"><input type="checkbox" id="mintRevoke" aria-label="Revoke mint authority"><span></span></label><div class="switch-cap">Revoke</div></div>
+    </div>
+    <div class="auth" id="authFreeze">
+      <div class="icon">❄️</div>
+      <div class="body"><h3>Freeze authority</h3><p>Can freeze holders' token accounts. Revoke to prove nobody can.</p><span class="status" id="stFreeze">—</span></div>
+      <div class="auth-ctl"><span class="fee-tag" data-fee-for="freezeRevoke">+0.1 SOL</span><label class="switch"><input type="checkbox" id="freezeRevoke" aria-label="Revoke freeze authority"><span></span></label><div class="switch-cap">Revoke</div></div>
+    </div>
+    <div class="auth" id="authMeta">
+      <div class="icon">📝</div>
+      <div class="body"><h3>Metadata update authority</h3><p>Can edit name, symbol and image. Revoke to make metadata immutable.</p><span class="status" id="stMeta">—</span></div>
+      <div class="auth-ctl"><span class="fee-tag" data-fee-for="metaRevoke">+0.1 SOL</span><label class="switch"><input type="checkbox" id="metaRevoke" aria-label="Revoke metadata update authority"><span></span></label><div class="switch-cap">Revoke</div></div>
+    </div>
+  </section>
+
+  <!-- 4. create -->
+  <section class="card">
+    <div class="card-head"><div class="step">4</div><div><h2>Create</h2><p id="createSub">Fees shown in the receipt below</p></div></div>
+    <div class="notice" id="mainnetNotice" style="margin:0 0 16px">⚠️ <b>Mainnet — real SOL.</b> Check the receipt below. Transactions cannot be undone.</div>
+    <button class="btn btn-primary btn-block" id="createBtn" disabled>🚀 Create token · 0.20 SOL</button>
+
+    <div class="receipt" id="receipt" aria-live="polite">
+      <h3>🧾 Fee receipt</h3>
+      <div class="rc-sec">Token creation</div>
+      <div class="rc-row"><div class="n">Create token</div><div class="v" id="rcBase">+0.2 SOL</div></div>
+      <div class="rc-sec">Premium features</div>
+      <div id="rcFeatures"></div>
+      <div class="rc-sec">Breakdown</div>
+      <div class="rc-row"><div class="n">Network cost<small>Rent + transaction fee, paid to Solana (est.)</small></div><div class="v" id="rcNet">—</div></div>
+      <div class="rc-row"><div class="n">Service fee<small>Feature fees minus network cost, sent to MemeForge</small></div><div class="v" id="rcOwner">—</div></div>
+      <div class="rc-total"><span>You pay in total</span><span class="v" id="rcTotal">—</span></div>
+      <p class="rc-note" id="rcNote"></p>
+      <div class="rc-warn" id="rcWarn"></div>
+    </div>
+    <div class="cprog" id="cprog" hidden role="status" aria-live="polite">
+      <div class="cprog-top"><b id="cpTitle">Starting…</b><span id="cpPct">0%</span></div>
+      <div class="cprog-track"><div class="cprog-fill" id="cpFill"></div></div>
+      <div class="cprog-dots" id="cpDots"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="cprog-sub"><span id="cpHint"></span><span id="cpTime"></span></div>
+    </div>
+    <div id="log">Ready. Connect a wallet to begin…</div>
+    <div class="result" id="result"></div>
+  </section>
+
+  <p class="foot">Runs entirely in your browser · <a href="index.html">Home</a> · <a href="https://raydium.io/liquidity/create-pool/" target="_blank" rel="noopener noreferrer">Add liquidity on Raydium ↗</a> · <a id="netExplorer" href="https://explorer.solana.com/" target="_blank" rel="noopener">Explorer</a><br>Never share your seed phrase. Not financial advice.</p>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<!-- wallet picker -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet">
+    <div class="sheet-head"><h3 id="sheetTitle">Connect a wallet</h3><button class="x" id="closeSheet" aria-label="Close">✕</button></div>
+    <p class="sub" id="sheetSub">Choose how you want to connect.</p>
+    <div class="wsearch" id="wSearchBox" hidden>
+      <svg class="mag" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="wSearch" type="search" placeholder="Search wallets…" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search wallets" enterkeyhint="search">
+      <button class="clr" id="wSearchClr" type="button" aria-label="Clear search">✕</button>
+    </div>
+    <div class="wcount" id="wCount" hidden></div>
+    <div id="walletList"></div>
+    <p class="tip" id="sheetTip"></p>
+  </div>
+</div>
+
+<script src="fees-config.js"></script>
+<script src="payment.js"></script>
+<script src="track.js"></script>
+<script type="module">
+/* =====================================================================
+   Config
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const METADATA_PROGRAM = 'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s';
+const SYSVAR_RENT = 'SysvarRent111111111111111111111111111111111';
+const LAMPORTS = 1_000_000_000;
+
+/* ---------- network (set in fees-config.js) ---------- */
+const SITE_CFG = window.MEMEFORGE_CONFIG || {};
+const IS_DEV = String(SITE_CFG.network || 'mainnet-beta').toLowerCase() === 'devnet';
+const NET_NAME = IS_DEV ? 'Devnet' : 'Mainnet';
+const DEFAULT_RPC = IS_DEV ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com';
+const CLUSTER_Q = IS_DEV ? '?cluster=devnet' : '';
+(function applyNetwork() {
+  document.title = `Create token — MemeForge (Solana ${NET_NAME})`;
+  $('netPill').textContent = `Solana · ${NET_NAME}`;
+  $('rpc').value = (typeof SITE_CFG.rpcUrl === 'string' && SITE_CFG.rpcUrl.trim()) || DEFAULT_RPC;
+  $('netExplorer').href = 'https://explorer.solana.com/' + CLUSTER_Q;
+  $('netExplorer').textContent = `${NET_NAME} Explorer`;
+  $('mainnetNotice').style.display = IS_DEV ? 'none' : 'block';
+  if (IS_DEV) {
+    $('airdropBtn').style.display = '';
+    $('netHint').innerHTML = 'Make sure your wallet is on <b>Devnet</b> (Phantom: Settings → Developer Settings → Testnet Mode). Need devnet SOL? The button copies your address and opens the <a class="link" href="https://faucet.solana.com" target="_blank" rel="noopener">Solana Faucet</a>.';
+  } else {
+    $('netHint').innerHTML = 'This page uses <b>real SOL on Mainnet</b>. Make sure your wallet is on <b>Mainnet</b> (Phantom: turn Testnet Mode <b>off</b> in Settings → Developer Settings).';
+  }
+})();
+
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+                 (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+const canDeepLink = /^https?:$/.test(location.protocol) && !/^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname);
+
+const state = { provider: null, wallet: null, address: null, walletName: '' };
+
+/* =====================================================================
+   Lazy library loading (so wallet connect never depends on the CDN)
+   ===================================================================== */
+let _libs = null;
+async function libs() {
+  if (_libs) return _libs;
+  try {
+    const [web3, spl] = await Promise.all([import('@solana/web3.js'), import('@solana/spl-token')]);
+    _libs = { web3, spl };
+    return _libs;
+  } catch (e) {
+    throw new Error('Could not load Solana libraries from the CDN. Check your connection and retry.');
+  }
+}
+libs().catch(() => {}); // warm up in background
+
+const rpcUrl = () => $('rpc').value.trim() || DEFAULT_RPC;
+async function getConn() {
+  const { web3 } = await libs();
+  return new web3.Connection(rpcUrl(), 'confirmed');
+}
+
+/* =====================================================================
+   Helpers
+   ===================================================================== */
+function log(msg, cls = 'info') {
+  const row = document.createElement('div');
+  const t = document.createElement('span'); t.className = 't'; t.textContent = `[${new Date().toLocaleTimeString()}] `;
+  const m = document.createElement('span'); m.className = cls; m.textContent = msg;
+  row.append(t, m);
+  $('log').appendChild(row);
+  $('log').scrollTop = $('log').scrollHeight;
+}
+const short = a => a.slice(0, 4) + '…' + a.slice(-4);
+
+/* ---------- toasts ---------- */
+function toast(title, type = 'ok', detail = '', ms) {
+  const box = $('toasts');
+  ms = ms || (type === 'err' ? 7000 : 4200);
+  const t = document.createElement('div'); t.className = 'toast ' + type; t.setAttribute('role', type === 'err' ? 'alert' : 'status');
+  const ic = document.createElement('div'); ic.className = 'ti'; ic.textContent = type === 'ok' ? '✓' : type === 'err' ? '!' : 'i';
+  const tb = document.createElement('div'); tb.className = 'tb';
+  const b = document.createElement('b'); b.textContent = title; tb.appendChild(b);
+  if (detail) { const d = document.createElement('span'); d.textContent = detail; tb.appendChild(d); }
+  const x = document.createElement('button'); x.type = 'button'; x.className = 'tx'; x.setAttribute('aria-label', 'Dismiss'); x.textContent = '×';
+  const bar = document.createElement('div'); bar.className = 'tt'; bar.style.animationDuration = ms + 'ms';
+  t.append(ic, tb, x, bar);
+  let timer; const close = () => { clearTimeout(timer); t.classList.add('out'); setTimeout(() => t.remove(), 230); };
+  x.onclick = close;
+  t.addEventListener('pointerenter', () => { clearTimeout(timer); bar.style.animationPlayState = 'paused'; });
+  t.addEventListener('pointerleave', () => { bar.style.animationPlayState = 'running'; timer = setTimeout(close, 1800); });
+  box.appendChild(t);
+  while (box.children.length > 3) box.firstChild.remove();
+  timer = setTimeout(close, ms);
+}
+
+/* ---------- creation progress bar (steps + elapsed time) ---------- */
+const STEPS = 6;
+const prog = (() => {
+  const el = $('cprog'), fill = $('cpFill'), dots = [...$('cpDots').children];
+  let creep = null, tick = null, value = 0, t0 = 0, step = 0;
+  const paint = () => { fill.style.width = value + '%'; $('cpPct').textContent = Math.floor(value) + '%'; };
+  const stopTimers = () => { clearInterval(creep); creep = null; };
+  return {
+    start() {
+      stopTimers(); clearInterval(tick); value = 0; step = 0; t0 = Date.now();
+      el.hidden = false; el.className = 'cprog'; dots.forEach(d => d.className = '');
+      $('cpTime').textContent = '0s'; paint();
+      tick = setInterval(() => { $('cpTime').textContent = Math.floor((Date.now() - t0) / 1000) + 's'; }, 500);
+    },
+    // go to step n (1-based) at `pct`; if `creepTo` is given the bar keeps inching forward while we wait on the network
+    to(n, pct, title, hint = '', creepTo = 0) {
+      stopTimers(); step = n; value = Math.max(value, pct);
+      dots.forEach((d, i) => d.className = i < n - 1 ? 'on' : i === n - 1 ? 'on cur' : '');
+      $('cpTitle').textContent = `Step ${n} of ${STEPS} · ${title}`; $('cpHint').textContent = hint; paint();
+      if (creepTo > value) creep = setInterval(() => { value += (creepTo - value) * 0.06; paint(); }, 400);
+    },
+    done(title) {
+      stopTimers(); clearInterval(tick); value = 100; el.className = 'cprog done'; dots.forEach(d => d.className = 'on');
+      $('cpTitle').textContent = title; $('cpHint').textContent = ''; paint();
+      setTimeout(() => { if (el.classList.contains('done')) el.hidden = true; }, 6000);
+    },
+    fail(title) {
+      stopTimers(); clearInterval(tick); el.className = 'cprog fail';
+      $('cpTitle').textContent = title; $('cpHint').textContent = 'Nothing was sent unless your wallet showed a confirmation.'; paint();
+    },
+  };
+})();
+const enc = new TextEncoder();
+const utf8len = s => enc.encode(s).length;
+function serStr(s) {
+  const b = enc.encode(s);
+  const out = new Uint8Array(4 + b.length);
+  new DataView(out.buffer).setUint32(0, b.length, true);
+  out.set(b, 4);
+  return out;
+}
+function concat(...arrs) {
+  const out = new Uint8Array(arrs.reduce((n, a) => n + a.length, 0));
+  let o = 0; for (const a of arrs) { out.set(a, o); o += a.length; }
+  return out;
+}
+const explorerAddr = a => `https://explorer.solana.com/address/${a}${CLUSTER_Q}`;
+const explorerTx = s => `https://explorer.solana.com/tx/${s}${CLUSTER_Q}`;
+const niceError = e => {
+  const m = String(e?.message ?? e);
+  if (/reject|denied|cancel/i.test(m)) return 'Request was cancelled in your wallet.';
+  return m;
+};
+
+/* =====================================================================
+   Wallet detection
+   ===================================================================== */
+/* The wallets in the popup come from the admin dashboard (Wallets page) through fees-config.js.
+   If the server list is missing (e.g. a static copy of this page) the three classic wallets are used. */
+const DEFAULT_WALLETS = [
+  { id: 'phantom',  name: 'Phantom',  color: '#6b5cf0', provider: 'phantom.solana', flag: 'isPhantom',  install: 'https://phantom.app/download',   deeplink: 'https://phantom.app/ul/browse/{url}?ref={ref}' },
+  { id: 'solflare', name: 'Solflare', color: '#fc8c1a', provider: 'solflare',       flag: 'isSolflare', install: 'https://solflare.com/download',  deeplink: 'https://solflare.com/ul/v1/browse/{url}?ref={ref}' },
+  { id: 'backpack', name: 'Backpack', color: '#e33e3f', provider: 'backpack',       flag: 'isBackpack', install: 'https://backpack.app/downloads', deeplink: 'https://backpack.app/ul/v1/browse/{url}?ref={ref}' },
+];
+const BAD_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+// Looks up "phantom.solana" on window. It only READS properties, nothing from the list is ever executed.
+function lookup(path) {
+  if (!path) return null;
+  let o = window;
+  for (const k of String(path).split('.')) {
+    if (o == null || BAD_KEYS.has(k)) return null;
+    try { o = o[k]; } catch { return null; }
+  }
+  return o && (typeof o === 'object' || typeof o === 'function') ? o : null;
+}
+const httpsOnly = u => (typeof u === 'string' && /^https:\/\//i.test(u) ? u : '');
+const WALLETS = (Array.isArray(SITE_CFG.wallets) ? SITE_CFG.wallets : DEFAULT_WALLETS).map(w => ({
+  id: String(w.id || w.name), name: String(w.name || 'Wallet'), logo: httpsOnly(w.logo), color: /^#[0-9a-f]{6}$/i.test(w.color || '') ? w.color : '#444444',
+  install: httpsOnly(w.install), deeplinkTpl: httpsOnly(w.deeplink), provider: w.provider || '', flag: w.flag || '',
+  get() {
+    const p = lookup(this.provider);
+    if (!p || typeof p.connect !== 'function') return null;
+    if (this.flag && !p[this.flag]) return null;
+    return p;
+  },
+  deeplink(u, ref) { return this.deeplinkTpl ? this.deeplinkTpl.replace('{url}', encodeURIComponent(u)).replace('{ref}', encodeURIComponent(ref)) : ''; },
+}));
+// Generic fallback: some in-app browsers only expose window.solana
+const genericProvider = () => {
+  const p = window.solana;
+  if (p && !WALLETS.some(w => w.get() === p)) return p;
+  return null;
+};
+
+let walletsExpanded = false;                         // survives the automatic re-detection below
+let walletQuery = '';                                // what is typed in the popup's search box
+function renderWalletList() {
+  const list = $('walletList');
+  list.innerHTML = '';
+  list.classList.toggle('expanded', walletsExpanded);
+  const here = location.href.split('#')[0];
+  const ref = location.origin;
+  let anyDetected = false;
+  const rows = [];
+  const SHOW = 4;                                   // wallets visible before the "Show more" button
+
+  const addRow = (w, provider) => {
+    const detected = !!provider;
+    if (detected) anyDetected = true;
+    const link = !detected && ((isMobile && w.deeplink && w.deeplink(here, ref)) || w.install);
+    const el = document.createElement(detected || !link ? 'button' : 'a');
+    el.className = 'wopt';
+    const icon = document.createElement('div'); icon.className = 'wi'; icon.style.background = w.logo ? 'rgba(255,255,255,.08)' : w.color;
+    const letter = () => { icon.textContent = w.letter || (w.name.trim()[0] || '?').toUpperCase(); };
+    if (w.logo) {
+      const img = document.createElement('img'); img.alt = ''; img.referrerPolicy = 'no-referrer'; img.src = w.logo;
+      img.onerror = () => { img.remove(); icon.style.background = w.color; letter(); };
+      icon.appendChild(img);
+    } else letter();
+    const text = document.createElement('div');
+    const n = document.createElement('div'); n.className = 'wn'; n.textContent = w.name;
+    const s = document.createElement('div'); s.className = 'ws';
+    const tag = document.createElement('span'); tag.className = 'tag';
+
+    if (detected) {
+      el.type = 'button';
+      s.textContent = 'Tap to connect';
+      tag.classList.add('det'); tag.textContent = 'Detected';
+      el.onclick = () => connectWith(w, provider);
+    } else if (isMobile && w.deeplink && w.deeplink(here, ref)) {
+      s.textContent = 'Opens this page in the wallet app';
+      tag.classList.add('app'); tag.textContent = 'Open app';
+      if (canDeepLink) { el.href = w.deeplink(here, ref); el.rel = 'noopener'; }
+      else { el.onclick = e => { e.preventDefault(); $('httpsNotice').classList.add('show'); closeSheet(); }; el.href = '#'; }
+    } else if (w.install) {
+      s.textContent = isMobile ? 'Install the wallet app first' : 'Browser extension not found';
+      tag.classList.add('get'); tag.textContent = 'Install ↗';
+      el.href = w.install; el.target = '_blank'; el.rel = 'noopener noreferrer';
+    } else {
+      el.type = 'button'; el.disabled = true;
+      s.textContent = 'Not detected in this browser';
+      tag.classList.add('get'); tag.textContent = 'Not found';
+    }
+    text.append(n, s);
+    el.append(icon, text, tag);
+    list.appendChild(el);
+    rows.push(el);
+  };
+
+  // detected first; while searching, only wallets whose name matches
+  const wq = walletQuery.trim().toLowerCase();
+  const sorted = [...WALLETS].sort((a, b) => (b.get() ? 1 : 0) - (a.get() ? 1 : 0));
+  for (const w of sorted) if (!wq || w.name.toLowerCase().includes(wq) || w.id.toLowerCase().includes(wq)) addRow(w, w.get());
+
+  const gp = genericProvider();
+  if (gp && !wq) addRow({ id: 'browser', name: 'Browser wallet', letter: '◎', color: '#333333', logo: '', install: '', deeplink: null }, gp);
+
+  // search box: only worth showing when there are many wallets; searching shows every match (no "Show more")
+  list.classList.toggle('searching', !!wq);
+  $('wSearchBox').hidden = WALLETS.length <= SHOW;
+  const cnt = $('wCount'); cnt.hidden = !wq && WALLETS.length <= SHOW;
+  cnt.textContent = wq ? `${rows.length} of ${WALLETS.length} wallets` : `${WALLETS.length} wallets`;
+  if (wq && !rows.length) { const none = document.createElement('div'); none.className = 'wnone'; none.textContent = `No wallet matches “${walletQuery.trim()}”.`; list.appendChild(none); }
+
+  // more than 4 wallets (and not searching): keep the first 4 (detected ones are sorted first) and tuck the rest behind a button
+  if (!wq && rows.length > SHOW) {
+    rows.slice(SHOW).forEach(r => r.classList.add('extra'));
+    const more = document.createElement('button'); more.type = 'button'; more.className = 'wmore';
+    const label = document.createElement('span'), chev = document.createElement('span'); chev.className = 'chev'; chev.textContent = '▾';
+    const hidden = rows.length - SHOW;
+    const paint = () => { label.textContent = list.classList.contains('expanded') ? 'Show fewer wallets' : `Show ${hidden} more wallet${hidden === 1 ? '' : 's'}`; };
+    more.append(label, chev); paint();
+    more.setAttribute('aria-expanded', String(walletsExpanded));
+    more.onclick = () => { walletsExpanded = list.classList.toggle('expanded'); more.setAttribute('aria-expanded', String(walletsExpanded)); paint(); };
+    rows[SHOW - 1].after(more);                    // button sits right under the 4th wallet; hidden ones appear below it
+  }
+
+  $('sheetSub').textContent = anyDetected || gp ? 'Choose a wallet to connect.' :
+    isMobile ? 'Open this page inside your wallet app to connect.' : 'Install a Solana wallet extension, then refresh.';
+  $('sheetTip').textContent = isMobile && !anyDetected
+    ? 'Tip: this opens the wallet\'s built-in browser. Make sure the wallet is on ' + NET_NAME + ' there before creating your token.'
+    : 'Make sure the wallet is set to ' + NET_NAME + ' before creating your token.';
+}
+
+function openSheet() {
+  walletsExpanded = false; walletQuery = ''; $('wSearch').value = ''; $('wSearchBox').classList.remove('has');
+  renderWalletList(); $('overlay').classList.add('open');
+  if (!isMobile && WALLETS.length > 4) setTimeout(() => $('wSearch').focus(), 60);   // phones: don't pop the keyboard open
+}
+$('wSearch').addEventListener('input', () => { walletQuery = $('wSearch').value; $('wSearchBox').classList.toggle('has', !!walletQuery); renderWalletList(); });
+$('wSearchClr').onclick = () => { walletQuery = ''; $('wSearch').value = ''; $('wSearchBox').classList.remove('has'); renderWalletList(); $('wSearch').focus(); };
+function closeSheet() { $('overlay').classList.remove('open'); }
+$('closeSheet').onclick = closeSheet;
+$('overlay').addEventListener('click', e => { if (e.target === $('overlay')) closeSheet(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+
+/* =====================================================================
+   Connect / disconnect
+   ===================================================================== */
+async function connectWith(w, provider, opts) {
+  try {
+    const res = await provider.connect(opts);
+    const pk = res?.publicKey ?? provider.publicKey;
+    if (!pk) throw new Error('Wallet did not return an address.');
+    attach(provider, pk, w);
+    closeSheet();
+    log(`✅ ${w.name} connected: ${pk.toString()}`, 'ok');
+    toast(`${w.name} connected`, 'ok', short(pk.toString()));
+    try { localStorage.setItem('lastWallet', w.id); } catch {}
+  } catch (e) {
+    log(`Wallet connect failed: ${niceError(e)}`, 'err');
+    toast('Wallet connect failed', 'err', niceError(e));
+  }
+}
+
+function attach(provider, pk, w) {
+  state.provider = provider;
+  state.wallet = pk;
+  state.address = pk.toString();
+  state.walletName = w?.name || '';
+  onConnected();
+  if (!provider.__bound) {
+    provider.__bound = true;
+    provider.on?.('disconnect', () => { if (state.provider === provider) onDisconnected(); });
+    provider.on?.('accountChanged', npk => {
+      if (state.provider !== provider) return;
+      if (!npk) { onDisconnected(); return; }
+      state.wallet = npk; state.address = npk.toString(); onConnected();
+      log(`🔁 Account changed: ${state.address}`, 'info');
+    });
+  }
+}
+
+// Tells the server which wallet address connected (once per address per browser session) so the admin Reports can list it.
+function reportWallet() {
+  const a = state.address; if (!a) return;
+  const key = 'mf_rep_' + a;
+  try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch {}
+  try { fetch('/api/wallet-connected', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify({ address: a, wallet: state.walletName }) }).catch(() => {}); } catch {}
+}
+function onConnected() {
+  reportWallet();
+  $('walletChip').style.display = 'inline-flex';
+  $('chipAddr').textContent = short(state.address);
+  $('topConnect').style.display = 'none';
+  $('connectBtn').style.display = 'none';
+  $('disconnectBtn').style.display = '';
+  $('airdropBtn').disabled = false;
+  $('createBtn').disabled = false;
+  updateAuthUI();
+  refreshBalance();
+}
+function onDisconnected() {
+  state.provider = null; state.wallet = null; state.address = null; state.walletName = '';
+  $('walletChip').style.display = 'none';
+  $('topConnect').style.display = '';
+  $('connectBtn').style.display = '';
+  $('disconnectBtn').style.display = 'none';
+  $('airdropBtn').disabled = true;
+  $('createBtn').disabled = true;
+  $('walletBal').textContent = '';
+  updateAuthUI();
+  log('Wallet disconnected', 'info');
+  toast('Wallet disconnected', 'info');
+}
+async function refreshBalance() {
+  if (!state.address) return;
+  try {
+    const { web3 } = await libs();
+    const bal = await (await getConn()).getBalance(new web3.PublicKey(state.address));
+    $('walletBal').textContent = (bal / LAMPORTS).toFixed(3) + ' SOL';
+  } catch { $('walletBal').textContent = ''; }
+}
+async function disconnect() {
+  const p = state.provider;
+  try { await p?.disconnect?.(); } catch {}
+  if (state.provider) onDisconnected();
+}
+$('connectBtn').onclick = openSheet;
+$('topConnect').onclick = openSheet;
+$('walletChip').onclick = () => { if (confirm('Disconnect wallet?')) disconnect(); };
+$('disconnectBtn').onclick = disconnect;
+
+/* Re-detect after load: mobile in-app browsers inject providers late. */
+function redetect() { if ($('overlay').classList.contains('open')) renderWalletList(); }
+window.addEventListener('load', () => { setTimeout(redetect, 300); setTimeout(redetect, 1200); });
+window.addEventListener('focus', redetect);
+
+/* Silent reconnect if the site was previously approved. */
+(async () => {
+  if (!canDeepLink && location.protocol !== 'file:') { /* localhost etc. still fine for desktop */ }
+  if (isMobile && !canDeepLink) $('httpsNotice').classList.add('show');
+  await new Promise(r => setTimeout(r, isMobile ? 800 : 250)); // let providers inject
+  let last = null; try { last = localStorage.getItem('lastWallet'); } catch {}
+  const pool = [...WALLETS.map(w => [w, w.get()]), [{ id: 'browser', name: 'Browser wallet' }, genericProvider()]];
+  for (const [w, p] of pool) {
+    if (!p) continue;
+    if (p.isConnected && p.publicKey) { attach(p, p.publicKey, w); log(`✅ ${w.name} already connected: ${state.address}`, 'ok'); return; }
+  }
+  if (last) {
+    const hit = pool.find(([w, p]) => w.id === last && p);
+    if (hit) { try { const r = await hit[1].connect({ onlyIfTrusted: true }); const pk = r?.publicKey ?? hit[1].publicKey; if (pk) { attach(hit[1], pk, hit[0]); log(`✅ Reconnected ${hit[0].name}: ${state.address}`, 'ok'); } } catch {} }
+  }
+})();
+
+/* =====================================================================
+   Airdrop
+   ===================================================================== */
+$('airdropBtn').onclick = async () => {
+  // The public devnet RPC faucet is closed, so send people to the web faucet with their address copied.
+  try { await navigator.clipboard.writeText(state.address); log('📋 Wallet address copied — paste it into the faucet, pick Devnet and request SOL.', 'info'); }
+  catch { log(`Your address: ${state.address} — paste it into the faucet and pick Devnet.`, 'info'); }
+  window.open('https://faucet.solana.com', '_blank', 'noopener');
+  log('Opened faucet.solana.com. After it succeeds, come back and the balance will update.', 'info');
+  setTimeout(refreshBalance, 15000); setTimeout(refreshBalance, 40000);
+};
+window.addEventListener('focus', () => { if (state.address) refreshBalance(); });
+
+/* =====================================================================
+   Authority UI
+   ===================================================================== */
+function updateAuthUI() {
+  const addr = state.address ? `You · ${short(state.address)}` : 'Your connected wallet';
+  for (const [chk, box, st] of [['mintRevoke', 'authMint', 'stMint'], ['freezeRevoke', 'authFreeze', 'stFreeze'], ['metaRevoke', 'authMeta', 'stMeta']]) {
+    const revoked = $(chk).checked;
+    $(box).classList.toggle('revoked', revoked);
+    $(st).textContent = revoked ? 'Revoked forever' : addr;
+  }
+}
+['mintRevoke', 'freezeRevoke', 'metaRevoke'].forEach(id => $(id).addEventListener('change', updateAuthUI));
+updateAuthUI();
+
+/* =====================================================================
+   Logo upload
+   ===================================================================== */
+const MAX_LOGO = 2 * 1024 * 1024;
+const OK_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/gif'];
+let logoData = null;
+
+function setLogo(dataUrl, name, size) {
+  logoData = { dataUrl, name, size };
+  $('logoImg').src = dataUrl;
+  $('logoMeta').innerHTML = '';
+  const b = document.createElement('b'); b.textContent = name;
+  $('logoMeta').append(b, document.createElement('br'), `${(size / 1024).toFixed(1)} KB · embedded in metadata.json`);
+  $('logoPreview').style.display = 'flex';
+  $('dropzone').style.display = 'none';
+}
+function clearLogo() {
+  logoData = null;
+  $('logoPreview').style.display = 'none';
+  $('dropzone').style.display = 'block';
+  $('logoInput').value = '';
+}
+function handleFile(f) {
+  if (!f) return;
+  if (!OK_TYPES.includes(f.type)) { log(`❌ Unsupported file type: ${f.type || 'unknown'}`, 'err'); toast('Unsupported file type', 'err', 'Use PNG, JPG, SVG or GIF.'); return; }
+  if (f.size > MAX_LOGO) { log(`❌ ${(f.size / 1048576).toFixed(2)} MB exceeds the 2 MB limit`, 'err'); toast('File is too big', 'err', 'The limit is 2 MB.'); return; }
+  const r = new FileReader();
+  r.onload = () => { setLogo(r.result, f.name, f.size); log(`🖼️ Logo loaded: ${f.name}`, 'ok'); toast('Logo added', 'ok', f.name); };
+  r.onerror = () => { log('❌ Failed to read file', 'err'); toast('Could not read that file', 'err'); };
+  r.readAsDataURL(f);
+}
+const dz = $('dropzone');
+dz.onclick = () => $('logoInput').click();
+$('logoInput').onchange = e => handleFile(e.target.files[0]);
+['dragover', 'dragenter'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+dz.addEventListener('drop', e => handleFile(e.dataTransfer.files[0]));
+$('logoRemove').onclick = clearLogo;
+/* ---------- description counter ---------- */
+$('desc').addEventListener('input', () => { $('descCount').textContent = `${$('desc').value.length} / 500`; });
+
+/* ---------- banner upload ---------- */
+let bannerData = null;
+const BANNER_TYPES = ['image/png', 'image/jpeg', 'image/gif'];
+function clearBanner() {
+  bannerData = null;
+  $('bannerPreview').style.display = 'none';
+  $('bannerDrop').style.display = 'block';
+  $('bannerInput').value = '';
+}
+function handleBanner(f) {
+  if (!f) return;
+  if (!BANNER_TYPES.includes(f.type)) { log(`❌ Banner must be PNG, JPG or GIF (got ${f.type || 'unknown'})`, 'err'); toast('Unsupported banner type', 'err', 'Use PNG, JPG or GIF.'); return; }
+  if (f.size > MAX_LOGO) { log(`❌ Banner is ${(f.size / 1048576).toFixed(2)} MB — the limit is 2 MB`, 'err'); toast('Banner is too big', 'err', 'The limit is 2 MB.'); return; }
+  const r = new FileReader();
+  r.onload = () => {
+    bannerData = { dataUrl: r.result, name: f.name, size: f.size, type: f.type };
+    $('bannerImg').src = r.result;
+    $('bannerMeta').innerHTML = '';
+    const b = document.createElement('b'); b.textContent = f.name;
+    $('bannerMeta').append(b, ` · ${(f.size / 1024).toFixed(1)} KB`);
+    $('bannerPreview').style.display = 'block';
+    $('bannerDrop').style.display = 'none';
+    log(`🌄 Banner loaded: ${f.name}`, 'ok');
+    toast('Banner added', 'ok', f.name);
+  };
+  r.onerror = () => { log('❌ Failed to read banner', 'err'); toast('Could not read that file', 'err'); };
+  r.readAsDataURL(f);
+}
+const bd = $('bannerDrop');
+bd.onclick = () => $('bannerInput').click();
+$('bannerInput').onchange = e => handleBanner(e.target.files[0]);
+['dragover', 'dragenter'].forEach(ev => bd.addEventListener(ev, e => { e.preventDefault(); bd.classList.add('drag'); }));
+['dragleave', 'drop'].forEach(ev => bd.addEventListener(ev, e => { e.preventDefault(); bd.classList.remove('drag'); }));
+bd.addEventListener('drop', e => handleBanner(e.dataTransfer.files[0]));
+$('bannerRemove').onclick = clearBanner;
+
+
+/* ---------- optional section toggles (banner / creator / social) ---------- */
+const OPT = ['banner', 'creator', 'social'];
+const optOn = k => $('tg_' + k).checked;
+OPT.forEach(k => $('tg_' + k).addEventListener('change', () => {
+  $('opt_' + k).classList.toggle('on', optOn(k));
+}));
+
+/* =====================================================================
+   Fees
+   - All amounts and the wallet come from fees-config.js (window.MEMEFORGE_CONFIG).
+   - The user's total = max(feature fees, network cost). The network cost goes to
+     Solana (rent + tx fee); whatever is left of the feature fees goes to FEE_WALLET.
+   ===================================================================== */
+/* The payment logic (fee maths, fee transfer instruction, on-chain verification)
+   lives in payment.js. This page only draws the receipt and calls those functions. */
+const P = window.MemeForgePayment;
+if (!P) throw new Error('payment.js was not found. Put it in the same folder as this page.');
+const { CFG, FEE_WALLET, BASE_FEE, FEATURES, money, validFeeWallet, activeFeatures } = P;
+const feeFeatureCount = () => activeFeatures().length;
+// Token account rent is only needed when there is an initial supply, so tell payment.js.
+function computeFees() {
+  const hasSupply = /^\d+$/.test(($('supply').value || '0').trim()) && BigInt(($('supply').value || '0').trim()) > 0n;
+  return P.computeFees(hasSupply);
+}
+// Fetch exact rent numbers from the RPC, then redraw the receipt if they changed.
+async function refineRent() {
+  try { if (await P.refineRent(await getConn())) renderReceipt(); } catch {}
+}
+function renderReceipt() {
+  const f = computeFees();
+  $('rcBase').textContent = '+' + money(BASE_FEE);
+  $('createSub').textContent = `Creation fee ${money(BASE_FEE)} + premium features · see the receipt below`;
+  const box = $('rcFeatures'); box.innerHTML = '';
+  for (const ft of FEATURES) {
+    const on = $(ft.id).checked;
+    const row = document.createElement('div'); row.className = 'rc-row' + (on ? '' : ' off');
+    const n = document.createElement('div'); n.className = 'n'; n.textContent = ft.name;
+    const v = document.createElement('div'); v.className = 'v'; v.textContent = ft.fee > 0 ? '+' + money(ft.fee) : 'Free';
+    row.append(n, v); box.appendChild(row);
+  }
+  $('rcNet').textContent = '≈ ' + (f.network / LAMPORTS).toFixed(4) + ' SOL';
+  $('rcOwner').textContent = (f.toOwner / LAMPORTS).toFixed(4) + ' SOL';
+  $('rcTotal').textContent = (f.total / LAMPORTS).toFixed(4) + ' SOL';
+  const act = activeFeatures(), featSum = act.reduce((n, x) => n + x.fee, 0);
+  $('rcNote').textContent = `Creation ${money(BASE_FEE)}` + (act.length ? ` + ${act.length} feature${act.length > 1 ? 's' : ''} (${money(featSum)})` : '') + ` = ${money(f.features / LAMPORTS)}. Of that, ≈ ${(f.network / LAMPORTS).toFixed(4)} SOL covers the real network cost and the remaining ${(f.toOwner / LAMPORTS).toFixed(4)} SOL is the service fee. Both are in the one transaction your wallet will show you before you approve.`;
+  // chips on every toggle: amount from the config, highlighted when switched on
+  for (const ft of FEATURES) {
+    const chip = document.querySelector(`.fee-tag[data-fee-for="${ft.id}"]`);
+    if (!chip) continue;
+    chip.textContent = ft.fee > 0 ? '+' + money(ft.fee) : 'Free';
+    chip.classList.toggle('on', $(ft.id).checked);
+  }
+  const cb = $('createBtn'); if (!cb.textContent.includes('Creating')) cb.textContent = `🚀 Create token · ${(f.total / LAMPORTS).toFixed(2)} SOL`;
+  const warn = $('rcWarn');
+  if (!CFG) { warn.style.display = 'block'; warn.textContent = '⚠️ Fee settings could not be loaded from the server. Default fees are being used.'; }
+  else if (f.toOwner > 0 && !validFeeWallet()) { warn.style.display = 'block'; warn.textContent = '⚠️ Fee wallet is not set yet. Set the fee wallet in the admin dashboard.'; }
+  else warn.style.display = 'none';
+}
+FEATURES.forEach(ft => $(ft.id).addEventListener('change', renderReceipt));
+$('supply').addEventListener('input', renderReceipt);
+renderReceipt();
+refineRent();
+$('rpc').addEventListener('change', () => { P.resetRent(); refineRent(); });
+
+/* ---------- metadata.json (Metaplex Token Metadata standard + extras) ---------- */
+function cleanUrl(id) {
+  const v = $(id).value.trim();
+  if (!v) return '';
+  try { const u = new URL(/^https?:\/\//i.test(v) ? v : 'https://' + v); return /^https?:$/.test(u.protocol) ? u.href : ''; }
+  catch { return ''; }
+}
+function buildMetadata() {
+  const name = $('name').value.trim() || 'My Token';
+  const symbol = $('symbol').value.trim() || 'TKN';
+  const desc = $('desc').value.trim();
+  const social = optOn('social'), creatorOn = optOn('creator'), bannerOn = optOn('banner');
+  const website = social ? cleanUrl('websiteUrl') : '';
+  const twitter = social ? cleanUrl('twitterUrl') : '';
+  const telegram = social ? cleanUrl('telegramUrl') : '';
+  const discord = social ? cleanUrl('discordUrl') : '';
+  const other = social ? cleanUrl('otherUrl') : '';
+  const creatorName = creatorOn ? $('creatorName').value.trim() : '';
+  const creatorSite = creatorOn ? cleanUrl('creatorSite') : '';
+
+  const meta = { name, symbol, description: desc || `${name} (${symbol})`, image: logoData ? logoData.dataUrl : '' };
+  if (bannerOn && bannerData) meta.banner = bannerData.dataUrl;
+  if (website) meta.external_url = website;
+  const ext = {};
+  if (website) ext.website = website;
+  if (twitter) ext.twitter = twitter;
+  if (telegram) ext.telegram = telegram;
+  if (discord) ext.discord = discord;
+  if (other) ext.other = other;
+  if (Object.keys(ext).length) meta.extensions = ext;
+
+  const files = [];
+  if (logoData) files.push({ uri: logoData.dataUrl, type: 'image', cdn: false, role: 'logo' });
+  if (bannerOn && bannerData) files.push({ uri: bannerData.dataUrl, type: bannerData.type, cdn: false, role: 'banner' });
+  meta.properties = { category: 'fungible', files };
+  if (creatorOn && (state.address || creatorName || creatorSite)) {
+    const c = {};
+    if (creatorName) c.name = creatorName;
+    if (creatorSite) c.site = creatorSite;
+    meta.properties.creators = [{ address: state.address || '', share: 100 }];
+    if (Object.keys(c).length) meta.creator = c;
+  }
+  return meta;
+}
+$('jsonBtn').onclick = () => {
+  const meta = buildMetadata();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' }));
+  a.download = 'metadata.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast('metadata.json downloaded', 'ok', 'Host it on IPFS or Arweave, then paste the link.');
+  log('⬇️ metadata.json downloaded — host it on IPFS/Arweave and paste the URL as Metadata URI. For best wallet support, replace "image" with a hosted image URL.', 'info');
+};
+
+/* =====================================================================
+   Metaplex Token Metadata — CreateMetadataAccountV3 (built by hand)
+   Instruction index 33, Borsh-encoded, NOT an Anchor discriminator.
+   ===================================================================== */
+async function createMetadataV3(mint, payer, name, symbol, uri, isMutable, addCreator) {
+  const { web3 } = await libs();
+  const program = new web3.PublicKey(METADATA_PROGRAM);
+  const [metadataPda] = web3.PublicKey.findProgramAddressSync(
+    [enc.encode('metadata'), program.toBytes(), mint.toBytes()], program);
+
+  const data = concat(
+    new Uint8Array([33]),                         // CreateMetadataAccountV3
+    serStr(name), serStr(symbol), serStr(uri),
+    new Uint8Array([0, 0]),                       // seller_fee_basis_points = 0
+    addCreator                                    // creators: Some([payer, verified, 100%]) or None
+      ? concat(new Uint8Array([1]), new Uint8Array([1, 0, 0, 0]), payer.toBytes(), new Uint8Array([1, 100]))
+      : new Uint8Array([0]),
+    new Uint8Array([0]),                          // collection: None
+    new Uint8Array([0]),                          // uses: None
+    new Uint8Array([isMutable ? 1 : 0]),          // is_mutable
+    new Uint8Array([0])                           // collection_details: None
+  );
+  const ix = new web3.TransactionInstruction({
+    programId: program,
+    keys: [
+      { pubkey: metadataPda, isSigner: false, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: payer, isSigner: true, isWritable: false },                       // mint authority
+      { pubkey: payer, isSigner: true, isWritable: true },                        // payer
+      { pubkey: payer, isSigner: false, isWritable: false },                      // update authority
+      { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: new web3.PublicKey(SYSVAR_RENT), isSigner: false, isWritable: false },
+    ],
+    data
+  });
+  return { ix, metadataPda };
+}
+
+/* =====================================================================
+   Create token
+   ===================================================================== */
+$('createBtn').onclick = async () => {
+  const btn = $('createBtn');
+  btn.disabled = true;
+  const oldLabel = btn.textContent;
+  btn.textContent = '⏳ Creating…';
+  prog.start();
+  try {
+    if (!state.wallet) throw new Error('Connect a wallet first');
+    prog.to(1, 4, 'Checking your details', 'Loading the Solana libraries…', 9);
+    const { web3, spl } = await libs();
+
+    const name = $('name').value.trim();
+    const symbol = $('symbol').value.trim();
+    const uri = $('uri').value.trim();
+    if (!name || !symbol) throw new Error('Token name and symbol are required');
+    if (utf8len(name) > 32) throw new Error('Name must be 32 bytes or fewer');
+    if (utf8len(symbol) > 10) throw new Error('Symbol must be 10 bytes or fewer');
+    if (utf8len(uri) > 200) throw new Error('Metadata URI must be 200 bytes or fewer');
+
+    const decimals = Math.max(0, Math.min(9, parseInt($('decimals').value || '9', 10) || 0));
+    const supplyStr = ($('supply').value || '0').trim();
+    if (!/^\d+$/.test(supplyStr)) throw new Error('Initial supply must be a whole number');
+    const supplyRaw = BigInt(supplyStr) * (10n ** BigInt(decimals));
+    if (supplyRaw > 18446744073709551615n) throw new Error('Supply is too large for a u64 — lower the supply or decimals');
+
+    const mintRevoke = $('mintRevoke').checked;
+    const freezeRevoke = $('freezeRevoke').checked;
+    const metaRevoke = $('metaRevoke').checked;
+
+    prog.to(2, 12, 'Building the transaction', 'Checking your balance and the network cost…', 24);
+    const conn = await getConn();
+    const payer = new web3.PublicKey(state.address);
+
+    const bal = await conn.getBalance(payer);
+    const fees = computeFees();
+    // payment.js: build the transfer of the remaining SOL to your fee wallet (also validates feeWallet)
+    const feeIx = P.buildFeeInstruction(web3, payer, fees);
+    // payment.js: make sure the user can afford network cost + service fee + a small buffer
+    P.assertCanAfford(bal, fees, IS_DEV);
+
+    const mint = web3.Keypair.generate();
+    log(`Generated mint keypair in-browser: ${mint.publicKey.toString()}`);
+
+    const rent = await spl.getMinimumBalanceForRentExemptMint(conn);
+    const tx = new web3.Transaction();
+
+    // 1) create + initialise the mint (wallet holds mint & freeze authority for now)
+    tx.add(web3.SystemProgram.createAccount({
+      fromPubkey: payer, newAccountPubkey: mint.publicKey,
+      space: spl.MINT_SIZE, lamports: rent, programId: spl.TOKEN_PROGRAM_ID
+    }));
+    tx.add(spl.createInitializeMint2Instruction(mint.publicKey, decimals, payer, payer, spl.TOKEN_PROGRAM_ID));
+
+    // 2) on-chain metadata (is_mutable = false when the update authority is revoked)
+    log('Adding Metaplex metadata…');
+    const verified = optOn('creator') && $('verifiedCreator').checked;
+    const { ix: metaIx, metadataPda } = await createMetadataV3(mint.publicKey, payer, name, symbol, uri, !metaRevoke, verified);
+    if (verified) log(`Verified creator: ${short(state.address)}`);
+    tx.add(metaIx);
+    log(metaRevoke ? 'Metadata will be IMMUTABLE (update authority revoked)' : `Metadata update authority: your wallet (${short(state.address)})`);
+
+    // 3) token account + initial supply
+    let ata = null;
+    if (supplyRaw > 0n) {
+      ata = spl.getAssociatedTokenAddressSync(mint.publicKey, payer);
+      tx.add(spl.createAssociatedTokenAccountIdempotentInstruction(payer, ata, payer, mint.publicKey));
+      tx.add(spl.createMintToInstruction(mint.publicKey, ata, payer, supplyRaw, [], spl.TOKEN_PROGRAM_ID));
+      log(`Minting ${supplyStr} tokens to your token account`);
+    }
+
+    // 4) revoke mint authority (after minting)
+    if (mintRevoke) {
+      tx.add(spl.createSetAuthorityInstruction(mint.publicKey, payer, spl.AuthorityType.MintTokens, null, [], spl.TOKEN_PROGRAM_ID));
+      log('Mint authority will be REVOKED (fixed supply)');
+    } else log(`Mint authority: your wallet (${short(state.address)})`);
+
+    // 5) revoke freeze authority
+    if (freezeRevoke) {
+      tx.add(spl.createSetAuthorityInstruction(mint.publicKey, payer, spl.AuthorityType.FreezeAccount, null, [], spl.TOKEN_PROGRAM_ID));
+      log('Freeze authority will be REVOKED');
+    } else log(`Freeze authority: your wallet (${short(state.address)})`);
+
+    // 6) service fee (feature fees minus the real network cost) -> fee wallet
+    if (feeIx) {
+      tx.add(feeIx);
+      log(`Service fee: ${(fees.toOwner / LAMPORTS).toFixed(4)} SOL → ${short(FEE_WALLET)} (creation + ${feeFeatureCount()} feature${feeFeatureCount() === 1 ? '' : 's'}, minus network cost)`);
+    }
+
+    // 7) sign + send
+    tx.feePayer = payer;
+    const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash('confirmed');
+    tx.recentBlockhash = blockhash;
+    tx.partialSign(mint);
+
+    if (!IS_DEV && !confirm(`MAINNET — this uses real SOL.\n\nYou will pay about ${(fees.total / LAMPORTS).toFixed(4)} SOL in total.\n(network cost ≈ ${(fees.network / LAMPORTS).toFixed(4)} SOL + service fee ${(fees.toOwner / LAMPORTS).toFixed(4)} SOL)\n\nContinue to your wallet?`)) throw new Error('Cancelled. Nothing was sent.');
+    log('Approve the transaction in your wallet…');
+    prog.to(3, 30, 'Approve in your wallet', 'Open your wallet and press Approve. The bar waits for you.', 38);
+    const p = state.provider;
+    let signature;
+    if (typeof p.signAndSendTransaction === 'function') {
+      const r = await p.signAndSendTransaction(tx);
+      signature = typeof r === 'string' ? r : r.signature;
+    } else if (typeof p.signTransaction === 'function') {
+      const signed = await p.signTransaction(tx);
+      signature = await conn.sendRawTransaction(signed.serialize());
+    } else throw new Error('This wallet cannot sign transactions.');
+
+    log(`Transaction sent: ${signature}`);
+    prog.to(4, 50, 'Confirming on Solana', 'Usually a few seconds. Please keep this page open.', 82);
+    await conn.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+    log(`✅ Token created and confirmed on ${NET_NAME.toLowerCase()}!`, 'ok');
+    prog.to(5, 86, 'Verifying the fee', 'Reading the confirmed transaction back…', 92);
+    // payment.js: confirm on-chain that the remaining SOL reached your fee wallet BEFORE showing the token address
+    try {
+      log('Verifying the service fee reached the fee wallet…');
+      const got = await P.verifyFeeDelivered(conn, signature, fees);
+      if (got > 0) log(`✅ Service fee received: ${(got / LAMPORTS).toFixed(4)} SOL → ${short(FEE_WALLET)}`, 'ok');
+    } catch (ve) {
+      // The fee is part of the same atomic transaction, so a confirmed tx means it was paid.
+      // This only fires if the RPC could not return the transaction details in time.
+      log(`⚠️ Could not double-check the fee transfer (${niceError(ve)}). The transaction is confirmed: ${explorerTx(signature)}`, 'err');
+    }
+    // Tell the server a token was created. It re-checks the transaction on-chain, then adds it to the report
+    // (creator wallet, what was spent, the fee sent to MemeForge, token name). Retries once if the RPC is still catching up.
+    prog.to(6, 94, 'Saving to the report', 'Almost done…', 99);
+    const ticked = FEATURES.filter(ft => $(ft.id).checked).map(ft => ft.key);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch('/api/token-created', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signature, mint: mint.publicKey.toString(), wallet: state.walletName, features: ticked }) });
+        if (r.ok) break;
+      } catch {}
+      if (attempt === 0) await new Promise(r => setTimeout(r, 2500));
+    }
+    refreshBalance();
+    prog.done('🎉 Token created!');
+    toast('Token created!', 'ok', `${symbol} · ${short(mint.publicKey.toString())} on ${NET_NAME.toLowerCase()}`, 8000);
+    showResult(mint.publicKey.toString(), ata?.toString(), metadataPda.toString(), signature);
+  } catch (e) {
+    log(`❌ ${niceError(e)}`, 'err');
+    prog.fail('Stopped: ' + niceError(e));
+    toast('Token was not created', 'err', niceError(e));
+  } finally {
+    btn.textContent = oldLabel;
+    btn.disabled = !state.wallet;
+  }
+};
+
+function showResult(mint, ata, meta, sig) {
+  const box = $('result');
+  box.innerHTML = '';
+  const h = document.createElement('h3'); h.textContent = '🎉 Token created'; box.appendChild(h);
+  const rows = [['Mint', mint], ata && ['Token account', ata], ['Metadata', meta], ['Signature', sig]].filter(Boolean);
+  for (const [k, v] of rows) {
+    const row = document.createElement('div'); row.className = 'kv';
+    const b = document.createElement('b'); b.textContent = k;
+    const c = document.createElement('code'); c.textContent = v; c.title = v;
+    const cp = document.createElement('button'); cp.className = 'btn btn-ghost btn-sm'; cp.textContent = 'Copy';
+    cp.onclick = async () => { try { await navigator.clipboard.writeText(v); cp.textContent = 'Copied ✓'; setTimeout(() => cp.textContent = 'Copy', 1500); } catch { cp.textContent = 'Select manually'; } };
+    row.append(b, c, cp); box.appendChild(row);
+  }
+  const links = document.createElement('div'); links.className = 'links';
+  for (const [t, href, cls] of [['💧 Add liquidity on Raydium', 'https://raydium.io/liquidity/create-pool/', 'btn-pink'], ['🔍 View mint', explorerAddr(mint), 'btn-ghost'], ['View transaction', explorerTx(sig), 'btn-ghost']]) {
+    const a = document.createElement('a'); a.className = 'btn btn-sm ' + cls; a.textContent = t; a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    links.appendChild(a);
+  }
+  box.appendChild(links);
+
+  box.style.display = 'block';
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+log(`Ready. ${NET_NAME} RPC: ` + rpcUrl());
+</script>
+<script>
+(function(){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const bg = document.getElementById('bg');
+  const n = innerWidth < 700 ? 12 : 24;
+  const emoji = ['🚀','💎','🌕','🔥','💰','🪙','✨','🍌','⚡','🎉'];
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  for (let i = 0; i < n; i++) {
+    const isCoin = i % 3 === 0, el = document.createElement('div'), size = isCoin ? rnd(26, 58) : rnd(22, 42);
+    el.style.left = rnd(0, 100) + 'vw';
+    el.style.animationDuration = rnd(18, 40) + 's';
+    el.style.animationDelay = (-rnd(0, 40)) + 's';
+    el.style.setProperty('--dx', rnd(-18, 18) + 'vw');
+    el.style.setProperty('--rot', (Math.random() < .5 ? -1 : 1) * rnd(180, 540) + 'deg');
+    el.style.opacity = rnd(.22, .55);
+    if (isCoin) { el.className = 'coin-bg'; el.style.width = el.style.height = size + 'px'; el.style.fontSize = size * .5 + 'px'; el.textContent = '$'; }
+    else { el.className = 'float'; el.style.fontSize = size + 'px'; el.textContent = emoji[Math.floor(Math.random() * emoji.length)]; }
+    bg.appendChild(el);
+  }
+})();
+</script>
+</body>
+</html>

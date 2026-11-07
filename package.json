@@ -1,0 +1,12 @@
+{
+  "name": "memeforge",
+  "version": "1.4.0",
+  "private": true,
+  "description": "MemeForge token creator with SQL-backed fees, admin dashboard, logo upload and database manager",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "engines": { "node": ">=22.13" }
+}
